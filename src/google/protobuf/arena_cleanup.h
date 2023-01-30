@@ -33,7 +33,6 @@
 
 #include <cstddef>
 #include <cstdint>
-#include <string>
 
 #include "absl/base/attributes.h"
 #include "absl/log/absl_check.h"
@@ -60,8 +59,7 @@ void arena_destruct_object(void* object) {
 // types must start with a `uintptr_t` that stores `Tag` in its low two bits.
 enum class Tag : uintptr_t {
   kDynamic = 0,  // DynamicNode
-  kString = 1,   // TaggedNode (std::string)
-  kCord = 2,     // TaggedNode (absl::Cord)
+  kCord = 1,     // TaggedNode (absl::Cord)
 };
 
 // DynamicNode contains the object (`elem`) that needs to be
@@ -72,18 +70,17 @@ struct DynamicNode {
   void (*destructor)(void*);
 };
 
-// TaggedNode contains a `std::string` or `absl::Cord` object (`elem`) that
-// needs to be destroyed. The lowest 2 bits of `elem` contain the non-zero
-// `kString` or `kCord` tag.
+// TaggedNode contains a `absl::Cord` object (`elem`) that needs to be
+// destroyed. The lowest 2 bits of `elem` contain the non-zero `kCord` tag.
 struct TaggedNode {
   uintptr_t elem;
 };
 
 // EnableSpecializedTags() return true if the alignment of tagged objects
-// such as std::string allow us to poke tags in the 2 LSB bits.
+// such as absl::Cord allow us to poke tags in the 2 LSB bits.
 inline constexpr bool EnableSpecializedTags() {
   // For now we require 2 bits
-  return alignof(std::string) >= 8 && alignof(absl::Cord) >= 8;
+  return alignof(absl::Cord) >= 8;
 }
 
 // Adds a cleanup entry identified by `tag` at memory location `pos`.
@@ -94,11 +91,6 @@ inline ABSL_ATTRIBUTE_ALWAYS_INLINE void CreateNode(Tag tag, void* pos,
   if (EnableSpecializedTags()) {
     ABSL_DCHECK_EQ(elem & 3, 0ULL);  // Must be aligned
     switch (tag) {
-      case Tag::kString: {
-        TaggedNode n = {elem | static_cast<uintptr_t>(Tag::kString)};
-        memcpy(pos, &n, sizeof(n));
-        return;
-      }
       case Tag::kCord: {
         TaggedNode n = {elem | static_cast<uintptr_t>(Tag::kCord)};
         memcpy(pos, &n, sizeof(n));
@@ -137,13 +129,6 @@ inline ABSL_ATTRIBUTE_ALWAYS_INLINE size_t DestroyNode(const void* pos) {
   memcpy(&elem, pos, sizeof(elem));
   if (EnableSpecializedTags()) {
     switch (static_cast<Tag>(elem & 3)) {
-      case Tag::kString: {
-        // Some compilers don't like fully qualified explicit dtor calls,
-        // so use an alias to avoid having to type `::`.
-        using T = std::string;
-        reinterpret_cast<T*>(elem - static_cast<uintptr_t>(Tag::kString))->~T();
-        return sizeof(TaggedNode);
-      }
       case Tag::kCord: {
         using T = absl::Cord;
         reinterpret_cast<T*>(elem - static_cast<uintptr_t>(Tag::kCord))->~T();
@@ -162,9 +147,6 @@ inline ABSL_ATTRIBUTE_ALWAYS_INLINE size_t DestroyNode(const void* pos) {
 // kDynamic if `destructor` does not identify a well know object type.
 inline ABSL_ATTRIBUTE_ALWAYS_INLINE Tag Type(void (*destructor)(void*)) {
   if (EnableSpecializedTags()) {
-    if (destructor == &arena_destruct_object<std::string>) {
-      return Tag::kString;
-    }
     if (destructor == &arena_destruct_object<absl::Cord>) {
       return Tag::kCord;
     }
@@ -182,8 +164,6 @@ inline ABSL_ATTRIBUTE_ALWAYS_INLINE Tag Type(void* raw) {
   switch (static_cast<Tag>(elem & 0x7ULL)) {
     case Tag::kDynamic:
       return Tag::kDynamic;
-    case Tag::kString:
-      return Tag::kString;
     case Tag::kCord:
       return Tag::kCord;
     default:
@@ -199,8 +179,6 @@ inline ABSL_ATTRIBUTE_ALWAYS_INLINE size_t Size(Tag tag) {
   switch (tag) {
     case Tag::kDynamic:
       return sizeof(DynamicNode);
-    case Tag::kString:
-      return sizeof(TaggedNode);
     case Tag::kCord:
       return sizeof(TaggedNode);
     default:
