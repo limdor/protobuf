@@ -15,12 +15,12 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout protobuf-php
-        uses: actions/checkout@v3
+        uses: actions/checkout@ac593985615ec2ede58e132d2e21d2b1cbd6127c # v3.3.0
         with:
           repository: protocolbuffers/protobuf-php
           token: ${{ secrets.BOT_ACCESS_TOKEN }}
       - name: Clone protobuf
-        uses: actions/checkout@v3
+        uses: actions/checkout@ac593985615ec2ede58e132d2e21d2b1cbd6127c # v3.3.0
         with:
           path: protobuf
       - name: Configure Git Bot
@@ -42,7 +42,7 @@ jobs:
           rm -rf protobuf
       - name: Push Changes
         run: |
-          git commit -a -m "$VERSION sync"
+          git commit -a -m "${{ env.VERSION }} sync"
           git push --force origin master
-          git tag -a $VERSION_TAG -m "Tag release $VERSION_TAG"
-          git push origin $VERSION_TAG
+          git tag -a ${{ env.VERSION_TAG }} -m "Tag release ${{ env.VERSION_TAG }}"
+          git push origin ${{ env.VERSION_TAG }}
