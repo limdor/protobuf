@@ -1,0 +1,38 @@
+name: C# Tests
+
+on:
+  workflow_call:
+    inputs:
+      safe-checkout:
+        required: true
+        description: "The SHA key for the commit we want to run over"
+        type: string
+
+jobs:
+  windows:
+    name: Windows
+    runs-on: windows-2019
+    steps:
+      - name: Checkout pending changes
+        uses: actions/checkout@ac593985615ec2ede58e132d2e21d2b1cbd6127c # v3.3.0
+        with:
+          ref: ${{ inputs.safe-checkout }}
+
+      - name: Run tests
+        shell: cmd
+        run: |
+          cd csharp
+
+          @rem Install dotnet SDK
+          powershell -File install_dotnet_sdk.ps1
+          set PATH=%LOCALAPPDATA%\Microsoft\dotnet;%PATH%
+
+          @rem Disable some unwanted dotnet options
+          set DOTNET_SKIP_FIRST_TIME_EXPERIENCE=true
+          set DOTNET_CLI_TELEMETRY_OPTOUT=true
+
+          @rem Work around https://github.com/dotnet/core/issues/5881
+          dotnet nuget locals all --clear
+
+          call buildall.bat
+
