@@ -22,7 +22,6 @@ runs:
   using: 'composite'
   steps:
     - name: Initialize BAZEL environment variable
-      if: runner.os == 'Windows'
       shell: bash
       run: echo "BAZEL=bazelisk" >> $GITHUB_ENV
 
