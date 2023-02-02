@@ -9,7 +9,7 @@ inputs:
 outputs:
   credentials-file:
     description: "Credentials file generated for GCP"
-    value: ${{ steps.auth.outputs.credentials_file_path }}
+    value: ${{ steps.output.outputs.credentials-file }}
 
 runs:
   using: 'composite'
@@ -24,3 +24,19 @@ runs:
     - name: Use gcloud CLI
       shell: bash
       run: gcloud info
+
+    - name: Store credentials path
+      shell: bash
+      run: echo "CREDENTIALS_FILE=${{ steps.auth.outputs.credentials_file_path }}" >> $GITHUB_ENV
+
+    - name: Fix credentials path (Windows)
+      if: ${{ runner.os == 'Windows' }}
+      # Bash commands in windows don't like the backslash in the file path.
+      # Assume we're running in the root directory and grab the base name.
+      shell: bash
+      run: echo "CREDENTIALS_FILE="$(basename ${CREDENTIALS_FILE//\\//}) >> $GITHUB_ENV
+
+    - name: Output credentials file
+      id: output
+      shell: bash
+      run: echo "credentials-file=${{ env.CREDENTIALS_FILE }}" >> $GITHUB_OUTPUT
