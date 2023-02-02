@@ -13,6 +13,10 @@ inputs:
     default: us-docker.pkg.dev/protobuf-build/containers/common/linux/bazel:5.1.1-aec4d74f2eb6938fc53ef7d9a79a4bf2da24abc1
     description: "The docker image to use"
     type: string
+  platform:
+    required: false
+    description: "The platform to use for the image"
+    type: string
 
 runs:
   using: 'composite'
@@ -28,8 +32,14 @@ runs:
         bazel-cache: regenerate-stale-files
         bash: ./regenerate_stale_files.sh $BAZEL_FLAGS
 
+    - name: Generate docker flags
+      if: inputs.platform
+      shell: bash
+      run: echo "DOCKER_RUN_FLAGS=--platform ${{inputs.platform}}" >> $GITHUB_ENV
+
     - name: Run Docker
       uses: ./.github/actions/internal/docker-run
       with:
         image: ${{ inputs.image }}
         command: ${{ inputs.command }}
+        run-flags: ${{ env.DOCKER_RUN_FLAGS }}

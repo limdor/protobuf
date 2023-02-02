@@ -11,6 +11,7 @@ cc_binary(
     deps = ["//ruby/ext/google/protobuf_c"],
     linkshared = 1,
     tags = ["manual"],
+    visibility = ["//ruby:__subpackages__"],
 )
 
 # Move the bundle to the location expected by our Ruby files.

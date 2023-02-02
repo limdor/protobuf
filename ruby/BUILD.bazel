@@ -4,6 +4,7 @@
 
 load("@rules_pkg//:mappings.bzl", "pkg_files", "strip_prefix")
 load("@rules_ruby//ruby:defs.bzl", "ruby_library")
+load("//build_defs:arch_tests.bzl", "aarch64_test", "x86_64_test")
 load("//build_defs:internal_shell.bzl", "inline_sh_binary")
 load("//:protobuf.bzl", "internal_ruby_proto_library")
 load("//conformance:defs.bzl", "conformance_test")
@@ -139,6 +140,18 @@ conformance_test(
         "@rules_ruby//ruby/runtime:config_jruby": [],
         "//conditions:default": ["@platforms//:incompatible"],
     }),
+)
+
+aarch64_test(
+    name = "aarch64_test",
+    bazel_binaries = ["//ruby/lib/google:protobuf_c.so"],
+    tags = ["manual"],
+)
+
+x86_64_test(
+    name = "x86_64_test",
+    bazel_binaries = ["//ruby/lib/google:protobuf_c.so"],
+    tags = ["manual"],
 )
 
 ################################################################################
