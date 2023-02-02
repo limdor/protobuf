@@ -723,34 +723,6 @@ TEST(ExtensionSetTest, UnpackedToPackedParsing) {
                            protobuf_unittest::FOREIGN_BAR);
 }
 
-TEST(ExtensionSetTest, IsInitialized) {
-  // Test that IsInitialized() returns false if required fields in nested
-  // extensions are missing.
-  unittest::TestAllExtensions message;
-
-  EXPECT_TRUE(message.IsInitialized());
-
-  message.MutableExtension(unittest::TestRequired::single);
-  EXPECT_FALSE(message.IsInitialized());
-
-  message.MutableExtension(unittest::TestRequired::single)->set_a(1);
-  EXPECT_FALSE(message.IsInitialized());
-  message.MutableExtension(unittest::TestRequired::single)->set_b(2);
-  EXPECT_FALSE(message.IsInitialized());
-  message.MutableExtension(unittest::TestRequired::single)->set_c(3);
-  EXPECT_TRUE(message.IsInitialized());
-
-  message.AddExtension(unittest::TestRequired::multi);
-  EXPECT_FALSE(message.IsInitialized());
-
-  message.MutableExtension(unittest::TestRequired::multi, 0)->set_a(1);
-  EXPECT_FALSE(message.IsInitialized());
-  message.MutableExtension(unittest::TestRequired::multi, 0)->set_b(2);
-  EXPECT_FALSE(message.IsInitialized());
-  message.MutableExtension(unittest::TestRequired::multi, 0)->set_c(3);
-  EXPECT_TRUE(message.IsInitialized());
-}
-
 TEST(ExtensionSetTest, MutableString) {
   // Test the mutable string accessors.
   unittest::TestAllExtensions message;

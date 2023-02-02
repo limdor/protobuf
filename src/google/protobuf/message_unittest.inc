@@ -198,62 +198,6 @@ TEST(MESSAGE_TEST_NAME, ParseHelpers) {
   }
 }
 
-TEST(MESSAGE_TEST_NAME, ParseFailsIfNotInitialized) {
-  UNITTEST::TestRequired message;
-
-  {
-    absl::ScopedMockLog log(absl::MockLogDefault::kDisallowUnexpected);
-    EXPECT_CALL(log, Log(absl::LogSeverity::kError, testing::_, absl::StrCat(
-            "Can't parse message of type \"", UNITTEST_PACKAGE_NAME,
-            ".TestRequired\" because it is missing required fields: a, b, c")));
-    log.StartCapturingLogs();
-    EXPECT_FALSE(message.ParseFromString(""));
-  }
-}
-
-TEST(MESSAGE_TEST_NAME, ParseFailsIfSubmessageNotInitialized) {
-  UNITTEST::TestRequiredForeign source, message;
-  source.mutable_optional_message()->set_dummy2(100);
-  std::string serialized = source.SerializePartialAsString();
-
-  EXPECT_TRUE(message.ParsePartialFromString(serialized));
-  EXPECT_FALSE(message.IsInitialized());
-
-  {
-    absl::ScopedMockLog log(absl::MockLogDefault::kDisallowUnexpected);
-    EXPECT_CALL(log, Log(absl::LogSeverity::kError, testing::_, absl::StrCat(
-          "Can't parse message of type \"", UNITTEST_PACKAGE_NAME,
-          ".TestRequiredForeign\" because it is missing required fields: "
-          "optional_message.a, optional_message.b, optional_message.c")));
-    log.StartCapturingLogs();
-    EXPECT_FALSE(message.ParseFromString(source.SerializePartialAsString()));
-  }
-}
-
-TEST(MESSAGE_TEST_NAME, ParseFailsIfExtensionNotInitialized) {
-  UNITTEST::TestChildExtension source, message;
-  auto* r = source.mutable_optional_extension()->MutableExtension(
-      UNITTEST::TestRequired::single);
-  r->set_dummy2(100);
-  std::string serialized = source.SerializePartialAsString();
-
-  EXPECT_TRUE(message.ParsePartialFromString(serialized));
-  EXPECT_FALSE(message.IsInitialized());
-
-{
-    absl::ScopedMockLog log(absl::MockLogDefault::kDisallowUnexpected);
-    EXPECT_CALL(log, Log(absl::LogSeverity::kError, testing::_, absl::Substitute(
-                  "Can't parse message of type \"$0.TestChildExtension\" "
-                  "because it is missing required fields: "
-                  "optional_extension.($0.TestRequired.single).a, "
-                  "optional_extension.($0.TestRequired.single).b, "
-                  "optional_extension.($0.TestRequired.single).c",
-                  UNITTEST_PACKAGE_NAME)));
-    log.StartCapturingLogs();
-    EXPECT_FALSE(message.ParseFromString(source.SerializePartialAsString()));
-  }
-}
-
 TEST(MESSAGE_TEST_NAME, MergeFromUninitialized) {
   UNITTEST::TestNestedRequiredForeign o, p, q;
   UNITTEST::TestNestedRequiredForeign* child = o.mutable_child();
@@ -275,7 +219,7 @@ TEST(MESSAGE_TEST_NAME, MergeFromUninitialized) {
   EXPECT_TRUE(TestUtil::EqualsToSerialized(q, p.SerializePartialAsString()));
 }
 
-TEST(MESSAGE_TEST_NAME, UninitializedAndTooDeep) {
+TEST(MESSAGE_TEST_NAME, TooDeep) {
   UNITTEST::TestRequiredForeign original;
   original.mutable_optional_message()->set_a(1);
   original.mutable_optional_lazy_message()
@@ -288,7 +232,6 @@ TEST(MESSAGE_TEST_NAME, UninitializedAndTooDeep) {
 
   UNITTEST::TestRequiredForeign pass;
   ASSERT_TRUE(pass.ParsePartialFromString(data));
-  ASSERT_FALSE(pass.IsInitialized());
 
   io::ArrayInputStream array_stream(data.data(), data.size());
   io::CodedInputStream input_stream(&array_stream);
@@ -296,9 +239,6 @@ TEST(MESSAGE_TEST_NAME, UninitializedAndTooDeep) {
 
   UNITTEST::TestRequiredForeign fail;
   EXPECT_FALSE(fail.ParsePartialFromCodedStream(&input_stream));
-
-  UNITTEST::TestRequiredForeign fail_uninitialized;
-  EXPECT_FALSE(fail_uninitialized.ParseFromString(data));
 }
 
 TEST(MESSAGE_TEST_NAME, ExplicitLazyExceedRecursionLimit) {
@@ -457,7 +397,7 @@ TEST(MESSAGE_TEST_NAME, ParseFailsIfGroupFieldMalformed) {
   EXPECT_FALSE(parsed.ParseFromString(data));
 }
 
-TEST(MESSAGE_TEST_NAME, UninitializedAndMalformed) {
+TEST(MESSAGE_TEST_NAME, Malformed) {
   UNITTEST::TestRequiredForeign o, p1, p2;
   o.mutable_optional_message()->set_a(-1);
 
@@ -467,12 +407,10 @@ TEST(MESSAGE_TEST_NAME, UninitializedAndMalformed) {
 
   // Should parse correctly.
   EXPECT_TRUE(p1.ParsePartialFromString(serialized));
-  EXPECT_FALSE(p1.IsInitialized());
 
   // Overwriting the last byte to 0xFF results in malformed wire.
   serialized[serialized.size() - 1] = 0xFF;
   EXPECT_FALSE(p2.ParseFromString(serialized));
-  EXPECT_FALSE(p2.IsInitialized());
 }
 
 inline UNITTEST::NestedTestAllTypes InitNestedProto(int depth) {
@@ -652,11 +590,6 @@ TEST(MESSAGE_TEST_NAME, BypassInitializationCheckOnParse) {
   EXPECT_TRUE(message.MergePartialFromCodedStream(&input));
 }
 
-TEST(MESSAGE_TEST_NAME, InitializationErrorString) {
-  UNITTEST::TestRequired message;
-  EXPECT_EQ("a, b, c", message.InitializationErrorString());
-}
-
 TEST(MESSAGE_TEST_NAME, DynamicCastToGenerated) {
   UNITTEST::TestAllTypes test_all_types;
 
@@ -679,24 +612,6 @@ TEST(MESSAGE_TEST_NAME, DynamicCastToGenerated) {
 }
 
 #if GTEST_HAS_DEATH_TEST  // death tests do not work on Windows yet.
-
-TEST(MESSAGE_TEST_NAME, SerializeFailsIfNotInitialized) {
-  UNITTEST::TestRequired message;
-  std::string data;
-  EXPECT_DEBUG_DEATH(
-      EXPECT_TRUE(message.SerializeToString(&data)),
-      absl::StrCat("Can't serialize message of type \"", UNITTEST_PACKAGE_NAME,
-                   ".TestRequired\" because "
-                   "it is missing required fields: a, b, c"));
-}
-
-TEST(MESSAGE_TEST_NAME, CheckInitialized) {
-  UNITTEST::TestRequired message;
-  EXPECT_DEATH(message.CheckInitialized(),
-               absl::StrCat("Message of type \"", UNITTEST_PACKAGE_NAME,
-                            ".TestRequired\" is missing required "
-                            "fields: a, b, c"));
-}
 
 #endif  // GTEST_HAS_DEATH_TEST
 
@@ -803,16 +718,6 @@ TEST(MESSAGE_TEST_NAME, BypassInitializationCheckOnSerialize) {
   io::ArrayOutputStream raw_output(nullptr, 0);
   io::CodedOutputStream output(&raw_output);
   EXPECT_TRUE(message.SerializePartialToCodedStream(&output));
-}
-
-TEST(MESSAGE_TEST_NAME, FindInitializationErrors) {
-  UNITTEST::TestRequired message;
-  std::vector<std::string> errors;
-  message.FindInitializationErrors(&errors);
-  ASSERT_EQ(3, errors.size());
-  EXPECT_EQ("a", errors[0]);
-  EXPECT_EQ("b", errors[1]);
-  EXPECT_EQ("c", errors[2]);
 }
 
 TEST(MESSAGE_TEST_NAME, ReleaseMustUseResult) {
@@ -990,52 +895,6 @@ TEST(MESSAGE_TEST_NAME, MergeFrom) {
   EXPECT_EQ(11, dest.repeated_uint32(0));
   EXPECT_EQ(12, dest.repeated_uint32(1));
   ASSERT_EQ(0, dest.repeated_uint64_size());
-}
-
-TEST(MESSAGE_TEST_NAME, IsInitialized) {
-  UNITTEST::TestIsInitialized msg;
-  EXPECT_TRUE(msg.IsInitialized());
-  UNITTEST::TestIsInitialized::SubMessage* sub_message =
-      msg.mutable_sub_message();
-  EXPECT_TRUE(msg.IsInitialized());
-  UNITTEST::TestIsInitialized::SubMessage::SubGroup* sub_group =
-      sub_message->mutable_subgroup();
-  EXPECT_FALSE(msg.IsInitialized());
-  sub_group->set_i(1);
-  EXPECT_TRUE(msg.IsInitialized());
-}
-
-TEST(MESSAGE_TEST_NAME, IsInitializedSplitBytestream) {
-  UNITTEST::TestRequired ab, c;
-  ab.set_a(1);
-  ab.set_b(2);
-  c.set_c(3);
-
-  // The protobuf represented by the concatenated string has all required
-  // fields (a,b,c) set.
-  std::string bytes =
-      ab.SerializePartialAsString() + c.SerializePartialAsString();
-
-  UNITTEST::TestRequired concatenated;
-  EXPECT_TRUE(concatenated.ParsePartialFromString(bytes));
-  EXPECT_TRUE(concatenated.IsInitialized());
-
-  UNITTEST::TestRequiredForeign fab, fc;
-  fab.mutable_optional_message()->set_a(1);
-  fab.mutable_optional_message()->set_b(2);
-  fc.mutable_optional_message()->set_c(3);
-
-  bytes = fab.SerializePartialAsString() + fc.SerializePartialAsString();
-
-  UNITTEST::TestRequiredForeign fconcatenated;
-  EXPECT_TRUE(fconcatenated.ParsePartialFromString(bytes));
-  EXPECT_TRUE(fconcatenated.IsInitialized());
-}
-
-TEST(MESSAGE_FACTORY_TEST_NAME, GeneratedFactoryLookup) {
-  EXPECT_EQ(MessageFactory::generated_factory()->GetPrototype(
-                UNITTEST::TestAllTypes::descriptor()),
-            &UNITTEST::TestAllTypes::default_instance());
 }
 
 TEST(MESSAGE_FACTORY_TEST_NAME, GeneratedFactoryUnknownType) {

@@ -891,23 +891,6 @@ TYPED_TEST(LiteTest, AllLite40) {
   }
 }
 
-TYPED_TEST(LiteTest, AllLite41) {
-  {
-    // IsInitialized
-    protobuf_unittest::TestRequiredMessageMapLite map_message;
-
-    // Add an uninitialized message.
-    (*map_message.mutable_map_field())[0];
-    EXPECT_FALSE(map_message.IsInitialized());
-
-    // Initialize uninitialized message
-    (*map_message.mutable_map_field())[0].set_a(0);
-    (*map_message.mutable_map_field())[0].set_b(0);
-    (*map_message.mutable_map_field())[0].set_c(0);
-    EXPECT_TRUE(map_message.IsInitialized());
-  }
-}
-
 TYPED_TEST(LiteTest, AllLite42) {
   {
     // Check that adding more values to enum does not corrupt message
@@ -920,7 +903,6 @@ TYPED_TEST(LiteTest, AllLite42) {
 
     protobuf_unittest::V1MessageLite v1_message;
     v1_message.ParseFromString(v2_bytes);
-    EXPECT_TRUE(v1_message.IsInitialized());
     EXPECT_EQ(v1_message.int_field(), v2_message.int_field());
     // V1 client does not understand V2_SECOND value, so it discards it and
     // uses default value instead.

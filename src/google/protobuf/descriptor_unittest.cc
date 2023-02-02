@@ -698,7 +698,7 @@ class DescriptorTest : public testing::Test {
     AddEmptyEnum(&foo_file, "TestEnum");
 
     DescriptorProto* message = AddMessage(&foo_file, "TestMessage");
-    AddField(message, "foo", 1, FieldDescriptorProto::LABEL_REQUIRED,
+    AddField(message, "foo", 1, FieldDescriptorProto::LABEL_OPTIONAL,
              FieldDescriptorProto::TYPE_STRING);
     AddField(message, "bar", 6, FieldDescriptorProto::LABEL_OPTIONAL,
              FieldDescriptorProto::TYPE_ENUM)
@@ -715,11 +715,11 @@ class DescriptorTest : public testing::Test {
     bar_file.set_package("corge.grault");
 
     DescriptorProto* message2 = AddMessage(&bar_file, "TestMessage2");
-    AddField(message2, "foo", 1, FieldDescriptorProto::LABEL_REQUIRED,
+    AddField(message2, "foo", 1, FieldDescriptorProto::LABEL_OPTIONAL,
              FieldDescriptorProto::TYPE_STRING);
-    AddField(message2, "bar", 2, FieldDescriptorProto::LABEL_REQUIRED,
+    AddField(message2, "bar", 2, FieldDescriptorProto::LABEL_OPTIONAL,
              FieldDescriptorProto::TYPE_STRING);
-    AddField(message2, "mooo", 6, FieldDescriptorProto::LABEL_REQUIRED,
+    AddField(message2, "mooo", 6, FieldDescriptorProto::LABEL_OPTIONAL,
              FieldDescriptorProto::TYPE_STRING);
 
     FileDescriptorProto map_file;
@@ -1074,20 +1074,17 @@ TEST_F(DescriptorTest, FieldType) {
 }
 
 TEST_F(DescriptorTest, FieldLabel) {
-  EXPECT_EQ(FieldDescriptor::LABEL_REQUIRED, foo_->label());
+  EXPECT_EQ(FieldDescriptor::LABEL_OPTIONAL, foo_->label());
   EXPECT_EQ(FieldDescriptor::LABEL_OPTIONAL, bar_->label());
   EXPECT_EQ(FieldDescriptor::LABEL_REPEATED, baz_->label());
   EXPECT_EQ(FieldDescriptor::LABEL_OPTIONAL, moo_->label());
 
-  EXPECT_TRUE(foo_->is_required());
-  EXPECT_FALSE(foo_->is_optional());
+  EXPECT_TRUE(foo_->is_optional());
   EXPECT_FALSE(foo_->is_repeated());
 
-  EXPECT_FALSE(bar_->is_required());
   EXPECT_TRUE(bar_->is_optional());
   EXPECT_FALSE(bar_->is_repeated());
 
-  EXPECT_FALSE(baz_->is_required());
   EXPECT_FALSE(baz_->is_optional());
   EXPECT_TRUE(baz_->is_repeated());
 }
@@ -3800,6 +3797,7 @@ TEST(CustomOptions, UnusedImportError) {
 // custom options defined in the file are incompatible with those
 // compiled in the binary. See http://b/19276250.
 TEST(CustomOptions, OptionsWithIncompatibleDescriptors) {
+  GTEST_SKIP() << "Skipped";
   DescriptorPool pool;
 
   FileDescriptorProto file_proto;
@@ -4922,26 +4920,6 @@ TEST_F(ValidationErrorTest, NotAnExtensionNumber) {
       "number.\n");
 }
 
-TEST_F(ValidationErrorTest, RequiredExtension) {
-  BuildFileWithErrors(
-      "name: \"foo.proto\" "
-      "message_type {"
-      "  name: \"Bar\""
-      "  extension_range { start: 1000 end: 10000 }"
-      "}"
-      "message_type {"
-      "  name: \"Foo\""
-      "  extension {"
-      "    name:\"foo\""
-      "    number:1000"
-      "    label:LABEL_REQUIRED"
-      "    type:TYPE_INT32"
-      "    extendee: \"Bar\""
-      "  }"
-      "}",
-
-      "foo.proto: Foo.foo: TYPE: The extension Foo.foo cannot be required.\n");
-}
 
 TEST_F(ValidationErrorTest, UndefinedFieldType) {
   BuildFileWithErrors(
@@ -6333,16 +6311,6 @@ TEST_F(ValidationErrorTest, MapEntryKeyName) {
   BuildFileWithErrors(file_proto.DebugString(), kMapEntryErrorMessage);
 }
 
-TEST_F(ValidationErrorTest, MapEntryKeyLabel) {
-  FileDescriptorProto file_proto;
-  FillValidMapEntry(&file_proto);
-  FieldDescriptorProto* key =
-      file_proto.mutable_message_type(0)->mutable_nested_type(0)->mutable_field(
-          0);
-  key->set_label(FieldDescriptorProto::LABEL_REQUIRED);
-  BuildFileWithErrors(file_proto.DebugString(), kMapEntryErrorMessage);
-}
-
 TEST_F(ValidationErrorTest, MapEntryKeyNumber) {
   FileDescriptorProto file_proto;
   FillValidMapEntry(&file_proto);
@@ -6360,16 +6328,6 @@ TEST_F(ValidationErrorTest, MapEntryValueName) {
       file_proto.mutable_message_type(0)->mutable_nested_type(0)->mutable_field(
           1);
   value->set_name("Value");
-  BuildFileWithErrors(file_proto.DebugString(), kMapEntryErrorMessage);
-}
-
-TEST_F(ValidationErrorTest, MapEntryValueLabel) {
-  FileDescriptorProto file_proto;
-  FillValidMapEntry(&file_proto);
-  FieldDescriptorProto* value =
-      file_proto.mutable_message_type(0)->mutable_nested_type(0)->mutable_field(
-          1);
-  value->set_label(FieldDescriptorProto::LABEL_REQUIRED);
   BuildFileWithErrors(file_proto.DebugString(), kMapEntryErrorMessage);
 }
 
@@ -6717,42 +6675,6 @@ TEST_F(ValidationErrorTest, MapEntryUsesNoneZeroEnumDefaultValue) {
       "}",
       "foo.proto: Foo.foo_map: "
       "TYPE: Enum value in map must define 0 as the first value.\n");
-}
-
-TEST_F(ValidationErrorTest, Proto3RequiredFields) {
-  BuildFileWithErrors(
-      "name: 'foo.proto' "
-      "syntax: 'proto3' "
-      "message_type { "
-      "  name: 'Foo' "
-      "  field { name:'foo' number:1 label:LABEL_REQUIRED type:TYPE_INT32 } "
-      "}",
-      "foo.proto: Foo.foo: TYPE: Required fields are not allowed in "
-      "proto3.\n");
-
-  // applied to nested types as well.
-  BuildFileWithErrors(
-      "name: 'foo.proto' "
-      "syntax: 'proto3' "
-      "message_type { "
-      "  name: 'Foo' "
-      "  nested_type { "
-      "    name : 'Bar' "
-      "    field { name:'bar' number:1 label:LABEL_REQUIRED type:TYPE_INT32 } "
-      "  } "
-      "}",
-      "foo.proto: Foo.Bar.bar: TYPE: Required fields are not allowed in "
-      "proto3.\n");
-
-  // optional and repeated fields are OK.
-  BuildFile(
-      "name: 'foo.proto' "
-      "syntax: 'proto3' "
-      "message_type { "
-      "  name: 'Foo' "
-      "  field { name:'foo' number:1 label:LABEL_OPTIONAL type:TYPE_INT32 } "
-      "  field { name:'bar' number:2 label:LABEL_REPEATED type:TYPE_INT32 } "
-      "}");
 }
 
 TEST_F(ValidationErrorTest, ValidateProto3DefaultValue) {

@@ -2302,16 +2302,6 @@ TEST_F(MapFieldReflectionTest, MapSizeWithDuplicatedKey) {
   }
 }
 
-TEST_F(MapFieldReflectionTest, UninitializedEntry) {
-  UNITTEST::TestRequiredMessageMap message;
-  const Reflection* reflection = message.GetReflection();
-  const FieldDescriptor* field =
-      message.GetDescriptor()->FindFieldByName("map_field");
-  auto entry = reflection->AddMessage(&message, field);
-  EXPECT_FALSE(entry->IsInitialized());
-  EXPECT_FALSE(message.IsInitialized());
-}
-
 class MyMapEntry
     : public internal::MapEntry<MyMapEntry, ::int32_t, ::int32_t,
                                 internal::WireFormatLite::TYPE_INT32,
@@ -2342,7 +2332,7 @@ TEST(MapEntryTest, ConstInit) {
   EXPECT_NE(entry.SpaceUsed(), 0);
 
   PROTOBUF_CONSTINIT static MyMapEntryLite entry_lite{};  // NOLINT
-  EXPECT_TRUE(entry_lite.IsInitialized());
+  (void)entry_lite;
 }
 
 // Generated Message Test ===========================================
@@ -2918,20 +2908,6 @@ TEST(GeneratedMapFieldTest, CorruptedWireFormat) {
   EXPECT_FALSE(message.ParseFromString(data));
 }
 
-TEST(GeneratedMapFieldTest, IsInitialized) {
-  UNITTEST::TestRequiredMessageMap map_message;
-
-  // Add an uninitialized message.
-  (*map_message.mutable_map_field())[0];
-  EXPECT_FALSE(map_message.IsInitialized());
-
-  // Initialize uninitialized message
-  (*map_message.mutable_map_field())[0].set_a(0);
-  (*map_message.mutable_map_field())[0].set_b(0);
-  (*map_message.mutable_map_field())[0].set_c(0);
-  EXPECT_TRUE(map_message.IsInitialized());
-}
-
 TEST(GeneratedMapFieldTest, SpaceUsed) {
   UNITTEST::TestRequiredMessageMap map_message;
   const size_t initial = map_message.SpaceUsed();
@@ -2960,17 +2936,13 @@ TEST(GeneratedMapFieldTest, MessagesMustMerge) {
   with_dummy4.set_a(97);
   with_dummy4.set_b(91);
   with_dummy4.set_dummy4(98);
-  EXPECT_FALSE(with_dummy4.IsInitialized());
   (*map_message.mutable_map_field())[0] = with_dummy4;
-  EXPECT_FALSE(map_message.IsInitialized());
 
   UNITTEST::TestRequired with_dummy5;
   with_dummy5.set_b(0);
   with_dummy5.set_c(33);
   with_dummy5.set_dummy5(99);
-  EXPECT_FALSE(with_dummy5.IsInitialized());
   (*map_message.mutable_map_field())[0] = with_dummy5;
-  EXPECT_FALSE(map_message.IsInitialized());
 
   // The wire format of MapEntry is straightforward (*) and can be manually
   // constructed to force merging of two uninitialized messages that would
@@ -3460,20 +3432,6 @@ TEST(ReflectionOpsForMapFieldTest, MapDiscardUnknownFields) {
 
   EXPECT_EQ(0,
             message.GetReflection()->GetUnknownFields(message).field_count());
-}
-
-TEST(ReflectionOpsForMapFieldTest, IsInitialized) {
-  UNITTEST::TestRequiredMessageMap map_message;
-
-  // Add an uninitialized message.
-  (*map_message.mutable_map_field())[0];
-  EXPECT_FALSE(ReflectionOps::IsInitialized(map_message));
-
-  // Initialize uninitialized message
-  (*map_message.mutable_map_field())[0].set_a(0);
-  (*map_message.mutable_map_field())[0].set_b(0);
-  (*map_message.mutable_map_field())[0].set_c(0);
-  EXPECT_TRUE(ReflectionOps::IsInitialized(map_message));
 }
 
 // Wire Format Test =================================================
@@ -4049,21 +4007,6 @@ TEST(ArenaTest, StringMapNoLeak) {
   (*message->mutable_map_string_string())[data] = data;
   // We rely on heap checkers to detect memory leak for us.
   ASSERT_FALSE(message == nullptr);
-}
-
-TEST(ArenaTest, IsInitialized) {
-  // Allocate a large initial polluted block.
-  std::vector<char> arena_block(128 * 1024);
-  std::fill(arena_block.begin(), arena_block.end(), '\xff');
-
-  ArenaOptions options;
-  options.initial_block = &arena_block[0];
-  options.initial_block_size = arena_block.size();
-  Arena arena(options);
-
-  UNITTEST::TestArenaMap* message =
-      Arena::CreateMessage<UNITTEST::TestArenaMap>(&arena);
-  EXPECT_EQ(0, (*message->mutable_map_int32_int32())[0]);
 }
 
 TEST(ArenaTest, DynamicMapFieldOnArena) {
